@@ -17,11 +17,11 @@
       "-fno-pie",
       "-c",
       "-o",
-      "user/find.o",
-      "user/find.c"
+      "user/xargs.o",
+      "user/xargs.c"
     ],
     "directory": "/home/fighter/mit6.s081/xv6-labs-2020",
-    "file": "/home/fighter/mit6.s081/xv6-labs-2020/user/find.c",
-    "output": "/home/fighter/mit6.s081/xv6-labs-2020/user/find.o"
+    "file": "/home/fighter/mit6.s081/xv6-labs-2020/user/xargs.c",
+    "output": "/home/fighter/mit6.s081/xv6-labs-2020/user/xargs.o"
   }
 ]
