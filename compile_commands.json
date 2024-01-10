@@ -17,11 +17,11 @@
       "-fno-pie",
       "-c",
       "-o",
-      "user/sleep.o",
-      "user/sleep.c"
+      "user/pingpong.o",
+      "user/pingpong.c"
     ],
     "directory": "/home/fighter/mit6.s081/xv6-labs-2020",
-    "file": "/home/fighter/mit6.s081/xv6-labs-2020/user/sleep.c",
-    "output": "/home/fighter/mit6.s081/xv6-labs-2020/user/sleep.o"
+    "file": "/home/fighter/mit6.s081/xv6-labs-2020/user/pingpong.c",
+    "output": "/home/fighter/mit6.s081/xv6-labs-2020/user/pingpong.o"
   }
 ]
