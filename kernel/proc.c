@@ -230,6 +230,9 @@ userinit(void)
 
   p->state = RUNNABLE;
 
+  // Lab2 Modified
+  p->trace_mask = 0;
+
   release(&p->lock);
 }
 
@@ -294,6 +297,9 @@ fork(void)
   pid = np->pid;
 
   np->state = RUNNABLE;
+
+  // Copy mask for trace syscall, Lab2 Modified
+  np->trace_mask = p->trace_mask;
 
   release(&np->lock);
 

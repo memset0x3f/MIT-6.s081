@@ -1,0 +1,27 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/riscv64-linux-gnu-gcc",
+      "-Wall",
+      "-Werror",
+      "-O",
+      "-fno-omit-frame-pointer",
+      "-ggdb",
+      "-DSOL_SYSCALL",
+      "-mcmodel=medany",
+      "-ffreestanding",
+      "-fno-common",
+      "-mno-relax",
+      "-I.",
+      "-fno-stack-protector",
+      "-fno-pie",
+      "-c",
+      "-o",
+      "kernel/syscall.o",
+      "kernel/syscall.c"
+    ],
+    "directory": "/home/fighter/mit6.s081/xv6-labs-2020",
+    "file": "/home/fighter/mit6.s081/xv6-labs-2020/kernel/syscall.c",
+    "output": "/home/fighter/mit6.s081/xv6-labs-2020/kernel/syscall.o"
+  }
+]
