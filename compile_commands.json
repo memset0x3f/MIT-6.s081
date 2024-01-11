@@ -17,11 +17,11 @@
       "-fno-pie",
       "-c",
       "-o",
-      "kernel/syscall.o",
-      "kernel/syscall.c"
+      "kernel/proc.o",
+      "kernel/proc.c"
     ],
     "directory": "/home/fighter/mit6.s081/xv6-labs-2020",
-    "file": "/home/fighter/mit6.s081/xv6-labs-2020/kernel/syscall.c",
-    "output": "/home/fighter/mit6.s081/xv6-labs-2020/kernel/syscall.o"
+    "file": "/home/fighter/mit6.s081/xv6-labs-2020/kernel/proc.c",
+    "output": "/home/fighter/mit6.s081/xv6-labs-2020/kernel/proc.o"
   }
 ]
