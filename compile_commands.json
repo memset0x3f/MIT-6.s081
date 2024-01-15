@@ -24,5 +24,31 @@
     "directory": "/home/fighter/mit6.s081/xv6-labs-2020",
     "file": "/home/fighter/mit6.s081/xv6-labs-2020/kernel/vm.c",
     "output": "/home/fighter/mit6.s081/xv6-labs-2020/kernel/vm.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/riscv64-linux-gnu-gcc",
+      "-Wall",
+      "-Werror",
+      "-O",
+      "-fno-omit-frame-pointer",
+      "-ggdb",
+      "-DSOL_PGTBL",
+      "-DLAB_PGTBL",
+      "-mcmodel=medany",
+      "-ffreestanding",
+      "-fno-common",
+      "-mno-relax",
+      "-I.",
+      "-fno-stack-protector",
+      "-fno-pie",
+      "-c",
+      "-o",
+      "kernel/proc.o",
+      "kernel/proc.c"
+    ],
+    "directory": "/home/fighter/mit6.s081/xv6-labs-2020",
+    "file": "/home/fighter/mit6.s081/xv6-labs-2020/kernel/proc.c",
+    "output": "/home/fighter/mit6.s081/xv6-labs-2020/kernel/proc.o"
   }
 ]
