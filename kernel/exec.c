@@ -112,6 +112,10 @@ exec(char *path, char **argv)
   oldpagetable = p->pagetable;
   p->pagetable = pagetable;
   p->sz = sz;
+  // Lab3 Modified
+  uvmunmap(p->kpagetable, 0, PGROUNDUP(oldsz)/PGSIZE, 0);   // Clear original kpagetable
+  kvmcopyfromuvm(p->kpagetable, p->pagetable, 0, p->sz);       // Copy new uvm to kvm
+  
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);

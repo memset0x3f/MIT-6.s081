@@ -185,6 +185,10 @@ void            perprockvmmap(pagetable_t, uint64, uint64, uint64, int);
 void            freewalkwithleaves(pagetable_t);
 void            proc_freekpagetable(pagetable_t);
 pte_t *         walk(pagetable_t, uint64, int);
+int             kvmcopyfromuvm(pagetable_t, pagetable_t, uint64, uint64);
+uint64          kvmdealloc(pagetable_t, uint64, uint64);
+int             copyin_new(pagetable_t, char *, uint64, uint64);
+int             copyinstr_new(pagetable_t, char *, uint64, uint64);
 
 // plic.c
 void            plicinit(void);

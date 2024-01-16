@@ -253,6 +253,9 @@ userinit(void)
   // and data into it.
   uvminit(p->pagetable, initcode, sizeof(initcode));
   p->sz = PGSIZE;
+  if(kvmcopyfromuvm(p->kpagetable, p->pagetable, 0, PGSIZE) < 0){
+    panic("process kvm copy from uvm");
+  }
 
   // prepare for the very first "return" from kernel to user.
   p->trapframe->epc = 0;      // user program counter
@@ -271,16 +274,27 @@ userinit(void)
 int
 growproc(int n)
 {
-  uint sz;
+  uint64 sz;
   struct proc *p = myproc();
 
   sz = p->sz;
+  if(PGROUNDUP(sz + n) >= PLIC){
+    return -1;
+  }
   if(n > 0){
     if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
       return -1;
     }
+    // Lab3 Modified
+    pte_t *pte;
+    if((pte = walk(p->pagetable, sz-n, 0)) == 0){
+      return -1;
+    }
+    kvmcopyfromuvm(p->kpagetable, p->pagetable, sz-n, n);
+    // kvmcopymappings(p->pagetable, p->kpagetable, sz-n, n);
   } else if(n < 0){
     sz = uvmdealloc(p->pagetable, sz, sz + n);
+    kvmdealloc(p->kpagetable, p->sz, p->sz+n);
   }
   p->sz = sz;
   return 0;
@@ -306,7 +320,15 @@ fork(void)
     release(&np->lock);
     return -1;
   }
+
   np->sz = p->sz;
+  
+  // Lab3 Modified
+  if(kvmcopyfromuvm(np->kpagetable, np->pagetable, 0, np->sz) < 0){
+    freeproc(np);
+    release(&np->lock);
+    return -1;
+  }
 
   np->parent = p;
 
