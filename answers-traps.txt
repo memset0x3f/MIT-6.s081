@@ -1,0 +1,6 @@
+a0,a1,a2... a2
+optimized out
+1576 (0x628)
+0x38
+HE110 World, 0x726c6400, no
+the value of a2
