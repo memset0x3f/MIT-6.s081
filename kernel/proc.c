@@ -106,9 +106,16 @@ allocproc(void)
 
 found:
   p->pid = allocpid();
+  p->alarmticks = 0;
+  p->ticksfromlast = 0;
+  p->handler = 0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
+    release(&p->lock);
+    return 0;
+  }
+  if((p->trapframecopy = (struct trapframe *)kalloc()) == 0){
     release(&p->lock);
     return 0;
   }
@@ -139,6 +146,9 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
+  if(p->trapframecopy)
+    kfree((void*)p->trapframecopy);
+  p->trapframecopy = 0;
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
@@ -445,6 +455,8 @@ wait(uint64 addr)
     sleep(p, &p->lock);  //DOC: wait-sleep
   }
 }
+
+// Modification End
 
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
