@@ -29,6 +29,32 @@ trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
+// Lab 5 Added
+// int lazyalloccheck(uint64 va){
+//   struct proc *p = myproc();
+//   return (walkaddr(p->pagetable, va) == 0) && (va <= p->sz) && (va > p->trapframe->sp);
+// }
+
+int lazyalloc(uint64 va){
+  struct proc *p = myproc();
+  va = PGROUNDDOWN(va);
+  if(va >= p->sz || va < p->trapframe->sp){
+    return -1;
+  }
+  else{
+    uint64 pa = (uint64)kalloc();
+    if(pa != 0){
+      memset((char*)pa, 0, PGSIZE);
+      if(mappages(p->pagetable, va, PGSIZE, pa, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
+        kfree((char*)pa);
+        return -1;
+      }
+    }
+    else return -1;
+  }
+  return 0;
+}
+
 //
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
@@ -68,9 +94,15 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
-    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-    p->killed = 1;
+    if(r_scause() == 13 || r_scause() == 15){
+      // uint64 va = PGROUNDDOWN(r_stval());
+      if(lazyalloc(r_stval()) != 0) p->killed = -1;
+    }
+    else{
+      printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+      p->killed = 1;
+    }
   }
 
   if(p->killed)
