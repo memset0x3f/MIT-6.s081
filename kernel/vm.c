@@ -15,6 +15,8 @@ extern char etext[];  // kernel.ld sets this to end of kernel code.
 
 extern char trampoline[]; // trampoline.S
 
+int refcnt[PHYSTOP/PGSIZE];
+
 /*
  * create a direct-map page table for the kernel.
  */
@@ -186,8 +188,13 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
       panic("uvmunmap: not mapped");
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
+    uint64 pa = PTE2PA(*pte);
     if(do_free){
-      uint64 pa = PTE2PA(*pte);
+      int idx = pa / PGSIZE;
+      if(refcnt[idx] <= 0){
+        printf("%p\n", pa);
+        panic("uvmunmap: refcnt is already 0");
+      }
       kfree((void*)pa);
     }
     *pte = 0;
@@ -311,8 +318,9 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
+  // char *mem;
 
+  // printf("sz: %d\n", sz);
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
       panic("uvmcopy: pte should exist");
@@ -320,13 +328,19 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto err;
-    memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
+    // if((mem = kalloc()) == 0)
+    //   goto err;
+    // memmove(mem, (char*)pa, PGSIZE);
+    if(mappages(new, i, PGSIZE, pa, (flags & (~PTE_W)) | PTE_COW) != 0){
+      // kfree(mem);
       goto err;
     }
+    refcnt[pa/PGSIZE]++;
+  }
+  for(i = 0; i < sz; i += PGSIZE){
+    pte = walk(old, i, 0);
+    *pte &= ~PTE_W;     // Not writable
+    *pte |= PTE_COW;    // Set COW sign bit
   }
   return 0;
 
@@ -357,10 +371,18 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
   uint64 n, va0, pa0;
 
   while(len > 0){
+    pte_t *pte;
     va0 = PGROUNDDOWN(dstva);
     pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
+    if(pa0 == 0){
       return -1;
+    }
+    pte = walk(pagetable, va0, 0);
+    if(!(*pte & PTE_W) && IS_COW(*pte)){    // COW
+      // printf("Copyout cow\n");
+      copy_on_write(va0);
+      pa0 = walkaddr(pagetable, va0);
+    }
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;

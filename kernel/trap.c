@@ -29,6 +29,35 @@ trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
+int copy_on_write(uint64 va){
+  va = PGROUNDDOWN(va);
+  struct proc *p = myproc();
+  char *mem;
+  pte_t *pte = walk(p->pagetable, va, 0);
+  if(!(*pte & PTE_W) && IS_COW(*pte)){
+    if((mem = kalloc()) == 0){
+      printf("usertrap(): out of memory\n");
+      p->killed = 1;
+      return -1;
+    }
+    else{
+      char *pa = (char *)PTE2PA(*pte);
+      uint64 flags = PTE_FLAGS(*pte);
+      memmove(mem, pa, PGSIZE);
+      uvmunmap(p->pagetable, va, 1, 1);
+      if(mappages(p->pagetable, va, PGSIZE, (uint64)mem, (flags | PTE_W) & (~PTE_COW)) != 0){
+        p->killed = 1;
+        return -1;
+      }
+    }
+  }
+  else{
+    p->killed = 1;
+    return -1;
+  }
+  return 0;
+}
+
 //
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
@@ -67,7 +96,17 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else {
+  } else if(r_scause() == 15){
+    uint64 va = r_stval();
+    if(va >= p->sz){
+      p->killed = 1;
+    }
+    else if(copy_on_write(va) != 0){
+      printf("Copy on write failed.\n");
+      p->killed = 1;
+    }
+  }
+  else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;

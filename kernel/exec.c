@@ -108,6 +108,7 @@ exec(char *path, char **argv)
       last = s+1;
   safestrcpy(p->name, last, sizeof(p->name));
     
+  // printf("Safe exec\n");
   // Commit to the user image.
   oldpagetable = p->pagetable;
   p->pagetable = pagetable;
@@ -119,6 +120,7 @@ exec(char *path, char **argv)
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:
+  // printf("Bad exec\n");
   if(pagetable)
     proc_freepagetable(pagetable, sz);
   if(ip){
