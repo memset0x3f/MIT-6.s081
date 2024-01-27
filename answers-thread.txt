@@ -1,0 +1,1 @@
+When 2 or more threads insert on the same hash table entry, there will be racing problems where multiple threads try to modify the entry list at the same time.
