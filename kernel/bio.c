@@ -72,12 +72,28 @@ bget(uint dev, uint blockno)
   struct buf *b;
   int id = blockno % NUMBUCKET;
 
-  acquire(&global_lock);
-
   // Is the block already cached?
   acquire(&bcache[id].lock);
   for(b = bcache[id].head.next; b != &bcache[id].head; b = b->next){
     if(b->dev == dev && b->blockno == blockno){
+      b->refcnt++;
+      acquire(&tickslock);
+      b->time_stamp = ticks;
+      release(&tickslock);
+      release(&bcache[id].lock);
+      // release(&global_lock);
+      acquiresleep(&b->lock);
+      return b;
+    }
+  }
+  release(&bcache[id].lock);
+
+  acquire(&global_lock);
+  // Not cached. Double check again.
+  acquire(&bcache[id].lock);
+  for(b = bcache[id].head.prev; b != &bcache[id].head; b = b->prev){
+    if(b->dev == dev && b->blockno == blockno){
+      printf("Fuck\n");
       b->refcnt++;
       acquire(&tickslock);
       b->time_stamp = ticks;
@@ -89,11 +105,10 @@ bget(uint dev, uint blockno)
     }
   }
   release(&bcache[id].lock);
-
-  // Not cached.
   // Recycle the least recently used (LRU) unused buffer.
   int min = 0x7fffffff;
   struct buf *minb = 0;
+  struct spinlock *minlock = 0;
   for (int i = 0; i < NUMBUCKET; i++) {
     acquire(&bcache[i].lock);
     for(b = bcache[i].head.prev; b != &bcache[i].head; b = b->prev){
@@ -101,26 +116,32 @@ bget(uint dev, uint blockno)
         if (b->time_stamp < min) {
           min = b->time_stamp;
           minb = b;
+          id = i;
+          if(minlock && minlock != &bcache[i].lock){
+            release(minlock);
+          }
+          minlock = &bcache[i].lock;
         }
       }
     }
-    release(&bcache[i].lock);
+    if(minlock != &bcache[i].lock){
+      release(&bcache[i].lock);
+    }
   }
   if(minb){
-      int id = minb->blockno % NUMBUCKET;
-      acquire(&bcache[id].lock);
+      // minlock is already acquired
+      // acquire(&bcache[id].lock);
+      int new_id = blockno % NUMBUCKET;
       minb->dev = dev;
       minb->valid = 0;
       minb->refcnt = 1;
       acquire(&tickslock);
       minb->time_stamp = ticks;
       release(&tickslock);
-      if(blockno % NUMBUCKET == id){
+      if(new_id == id){
         minb->blockno = blockno;
       }
       else{
-        int new_id = blockno % NUMBUCKET;
-        // acquire(&global_lock);
         minb->blockno = blockno;
         minb->next->prev = minb->prev;
         minb->prev->next = minb->next;
@@ -128,9 +149,8 @@ bget(uint dev, uint blockno)
         minb->prev = &bcache[new_id].head;
         bcache[new_id].head.next->prev = minb;
         bcache[new_id].head.next = minb;
-        // release(&global_lock);
       }
-      release(&bcache[id].lock);
+      release(minlock);
       release(&global_lock);
       acquiresleep(&minb->lock);
       return minb;
