@@ -283,6 +283,29 @@ create(char *path, short type, short major, short minor)
   return ip;
 }
 
+#define MAXDEPTH 10
+struct inode * follow(struct inode *ip, int depth){
+  if(ip->type == T_FILE) return ip;
+  if(depth >= MAXDEPTH)
+    return 0;
+  char target[MAXPATH];
+  if(readi(ip, 0, (uint64)target, 0, MAXPATH) < 0)
+    return 0;
+  
+  // printf("%d %s\n", depth, target);
+  struct inode *nxt;
+  if((nxt = namei(target)) == 0)
+    return 0;
+
+  if(holdingsleep(&nxt->lock)){     // Loop
+    return 0;
+  }
+  ilock(nxt);
+  struct inode *result = follow(nxt, depth+1);
+  if(nxt != result) iunlockput(nxt);
+  return result;
+}
+
 uint64
 sys_open(void)
 {
@@ -320,7 +343,8 @@ sys_open(void)
     iunlockput(ip);
     end_op();
     return -1;
-  }
+  }  
+  
 
   if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
     if(f)
@@ -330,6 +354,16 @@ sys_open(void)
     return -1;
   }
 
+  if(ip->type == T_SYMLINK && !(omode & O_NOFOLLOW)){
+    struct inode* tmp = follow(ip, 0);    // tmp cannot be equal to ip since ip->type == T_SYMLINK
+    iunlockput(ip);
+    if(tmp == 0){
+      end_op();
+      return -1;
+    }
+    ip = tmp;
+  }
+  
   if(ip->type == T_DEVICE){
     f->type = FD_DEVICE;
     f->major = ip->major;
@@ -337,6 +371,7 @@ sys_open(void)
     f->type = FD_INODE;
     f->off = 0;
   }
+
   f->ip = ip;
   f->readable = !(omode & O_WRONLY);
   f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
@@ -349,6 +384,29 @@ sys_open(void)
   end_op();
 
   return fd;
+}
+
+uint64 sys_symlink(void){
+  struct inode* ip;
+  int len;
+  char target[MAXPATH], path[MAXPATH];
+
+  if((len = argstr(0, target, MAXPATH)) < 0 || argstr(1, path, MAXPATH) < 0)
+    return -1;
+  begin_op();
+  ip = create(path, T_SYMLINK, 0, 0);
+  if(ip == 0){
+    end_op();
+    return -1;
+  }
+  if(writei(ip, 0, (uint64)target, 0, len) != len){
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+  iunlockput(ip);
+  end_op();
+  return 0;
 }
 
 uint64
