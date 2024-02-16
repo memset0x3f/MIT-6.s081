@@ -104,6 +104,7 @@ e1000_transmit(struct mbuf *m)
   // a pointer so that it can be freed after sending.
   //
   acquire(&e1000_lock);
+
   int index = regs[E1000_TDT];
   struct tx_desc* tx_desc = &tx_ring[index];
 
@@ -119,9 +120,10 @@ e1000_transmit(struct mbuf *m)
 
   tx_desc->addr = (uint64)m->head;
   tx_desc->length = m->len;
-  tx_desc->cmd |= E1000_TXD_CMD_EOP | E1000_TXD_CMD_RS;
+  tx_desc->cmd = E1000_TXD_CMD_EOP | E1000_TXD_CMD_RS;
   tx_mbufs[index] = m;
   regs[E1000_TDT] = (index+1) % TX_RING_SIZE;
+
   release(&e1000_lock);
   
   return 0;
