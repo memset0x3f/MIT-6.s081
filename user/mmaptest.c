@@ -161,8 +161,10 @@ mmap_test(void)
   if (close(fd) == -1)
     err("close");
 
+  // printf("%p\n", p);
   // check that the mapping still works after close(fd).
   _v1(p);
+
 
   // write the mapped memory.
   for (i = 0; i < PGSIZE*2; i++)

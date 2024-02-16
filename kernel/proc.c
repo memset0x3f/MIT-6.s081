@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
 
 struct cpu cpus[NCPU];
 
@@ -133,6 +134,9 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
+
+  // Lab mmap
+  for(int i = 0; i < NUMVMA; i++) p->vmas[i].valid = 1;
 
   return p;
 }
@@ -290,6 +294,17 @@ fork(void)
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
 
+  for(int i = 0; i < NUMVMA; i++){
+    if(p->vmas[i].valid) continue;
+    np->vmas[i].valid = p->vmas[i].valid;
+    np->vmas[i].addr = p->vmas[i].addr;
+    np->vmas[i].end = p->vmas[i].end;
+    np->vmas[i].len = p->vmas[i].len;
+    np->vmas[i].flags = p->vmas[i].flags;
+    np->vmas[i].prot = p->vmas[i].prot;
+    np->vmas[i].file = filedup(p->vmas[i].file);
+  }
+
   // increment reference counts on open file descriptors.
   for(i = 0; i < NOFILE; i++)
     if(p->ofile[i])
@@ -343,6 +358,8 @@ exit(int status)
 
   if(p == initproc)
     panic("init exiting");
+
+  freeallvma();
 
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){

@@ -140,6 +140,10 @@ int             fetchstr(uint64, char*, int);
 int             fetchaddr(uint64, uint64*);
 void            syscall();
 
+// sysfile.c
+int             mmaphandler(uint64);
+void            freeallvma(void);
+
 // trap.c
 extern uint     ticks;
 void            trapinit(void);
@@ -168,6 +172,7 @@ void            uvmfree(pagetable_t, uint64);
 void            uvmunmap(pagetable_t, uint64, uint64, int);
 void            uvmclear(pagetable_t, uint64);
 uint64          walkaddr(pagetable_t, uint64);
+pte_t *         walk(pagetable_t, uint64, int);
 int             copyout(pagetable_t, uint64, char *, uint64);
 int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);

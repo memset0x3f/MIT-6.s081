@@ -16,6 +16,9 @@
 #include "file.h"
 #include "fcntl.h"
 
+
+#define min(a, b) ((a) < (b) ? (a) : (b))
+
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -351,6 +354,178 @@ sys_open(void)
   return fd;
 }
 
+// void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
+uint64 sys_mmap(void){
+  struct file* file;
+  int len, fd;
+  int prot, flags;
+  struct proc *p = myproc();
+  struct vma *vma = 0;
+
+  if(argint(1, &len) < 0 || argint(2, &prot) < 0|| argint(3, &flags) < 0|| argfd(4, &fd, &file) < 0){
+    return -1;
+  }
+
+  if((prot & PROT_WRITE) && !file->writable && (flags == MAP_SHARED)){
+    // panic("Wrting an readonly file on disk.");
+    return -1;
+  }
+
+  // Find a valid (idle) vma.
+  for(int i = 0; i < NUMVMA; i++){
+    if(p->vmas[i].valid){
+      vma = &p->vmas[i];
+      break;
+    }
+  }
+  if(vma == 0){
+    panic("No Valid VMA");
+    return -1;
+  }
+  // Reference Increment
+  file = filedup(file);
+
+  vma->valid = 0;
+  vma->file = file;
+  vma->prot = prot;
+  vma->flags = flags;
+  vma->addr = PGROUNDUP(p->sz);
+  vma->len = len;
+  vma->end = PGROUNDUP(vma->addr+len);    // PGSIZE Alignment
+  // printf("%d ", p->sz);
+  p->sz = vma->end;
+  // printf("%d\n", p->sz);
+
+  return vma->addr;
+}
+
+struct vma *findvma(uint64 addr){
+  struct proc *p = myproc();
+  for(int i = 0; i < NUMVMA; i++){
+    if(!p->vmas[i].valid && p->vmas[i].addr <= addr && p->vmas[i].end > addr){
+      return &p->vmas[i];
+    }
+  }
+  return 0;
+}
+
+int mmaphandler(uint64 addr){
+  struct vma *vma = findvma(addr);
+  if(vma == 0){   // Page fault not caused by mmap
+    // panic("Unexpected page fault!");
+    return -1;
+  }
+  uint64 mem = (uint64)kalloc();
+  if(mem == 0){
+    panic("No memory available for mmap kalloc.");
+  }
+  memset((void *)mem, 0, PGSIZE);
+
+  struct inode *ip = vma->file->ip;
+  uint64 offset = PGROUNDDOWN(addr-vma->addr);   // PGSIZE Alignment
+  int perm = PTE_U;
+  if(vma->prot | PROT_READ) perm |= PTE_R;
+  if(vma->prot | PROT_WRITE) perm |= PTE_W;
+
+  begin_op();
+  ilock(ip);
+  readi(ip, 0, mem, offset, min(PGSIZE, vma->len-offset));
+  iunlock(ip);
+  end_op();
+  
+  struct proc *p = myproc();
+  if(mappages(p->pagetable, vma->addr+offset, PGSIZE, mem, perm) < 0){
+    panic("Map vma failed.");
+    return -1;
+  }
+  return 0;
+}
+
+uint64 sys_munmap(void){
+  uint64 addr;
+  int len;
+  if(argaddr(0, &addr) < 0 || argint(1, &len) < 0) return -1;
+
+  struct vma *vma = findvma(addr);
+  if(vma == 0){
+    panic("Cannot find vma corresponding to the address.");
+    return -1;
+  }
+
+  uint64 start = PGROUNDUP(addr), end = PGROUNDDOWN(addr+len);
+  int npages = (end-start)/PGSIZE;
+  struct proc *p = myproc();
+  pte_t *pte;
+  struct inode *ip = vma->file->ip;
+  if(vma->flags & MAP_SHARED){
+    begin_op();
+    ilock(ip);
+    for(int i = PGROUNDDOWN(addr); i < PGROUNDUP(addr+len); i += PGSIZE){
+      pte = walk(p->pagetable, i, 0);
+      if(*pte & PTE_D){    // Dirty page
+        writei(ip, 1, i, i-vma->addr, PGSIZE);
+      }
+    }
+    iunlock(ip);
+    end_op();
+  }
+  
+  // Set the unfreed (still mapped because of part of the block is not munmapped) part to 0
+  int offset = addr-PGROUNDDOWN(addr);
+  char *mem = (char *)walkaddr(p->pagetable, PGROUNDDOWN(addr));
+  memset(mem+offset, 0, start-addr);
+
+  mem = (char *)walkaddr(p->pagetable, end);
+  memset(mem, 0, addr+len-end);
+
+  uvmunmap(p->pagetable, start, npages, 1);
+
+  if(addr == vma->addr && len == vma->len){     // munmap the whole block
+    fileclose(vma->file);       // Decrement file ref count.
+    vma->valid = 1;             // Make the vma valid for new mmaps.
+  }
+  else if(addr == vma->addr){                   // munmap from the start
+    vma->addr = end;
+    vma->len -= len;
+  }
+  else if(addr+len == vma->addr+vma->len){      // munmap from tail
+    vma->end = PGROUNDUP(addr);
+    vma->len -= len;
+  }
+  else{
+    panic("munmap in the middle!");
+    return -1;
+  }
+  
+  return 0;
+}
+
+void freeallvma(){
+  struct proc *p = myproc();
+  struct vma *vma;
+  struct inode *ip;
+  pte_t *pte;
+  for(int i = 0; i < NUMVMA; i++){
+    vma = &p->vmas[i];
+    if(vma->valid) continue;
+    ip = vma->file->ip;
+    if(vma->flags & MAP_SHARED){
+      begin_op();
+      ilock(ip);
+      for(int i = vma->addr; i < vma->end; i += PGSIZE){
+        pte = walk(p->pagetable, i, 0);
+        if(*pte & PTE_D){    // Dirty page
+          writei(ip, 1, i, i-vma->addr, PGSIZE);
+        }
+      }
+      iunlock(ip);
+      end_op();
+    }
+    fileclose(vma->file);
+    vma->valid = 1;
+  }
+}
+
 uint64
 sys_mkdir(void)
 {
@@ -483,12 +658,4 @@ sys_pipe(void)
     return -1;
   }
   return 0;
-}
-
-uint64 sys_mmap(void){
-  return -1;
-}
-
-uint64 sys_munmap(void){
-  return -1;
 }

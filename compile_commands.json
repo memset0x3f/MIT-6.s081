@@ -18,11 +18,37 @@
       "-fno-pie",
       "-c",
       "-o",
-      "user/usys.o",
-      "user/usys.S"
+      "kernel/proc.o",
+      "kernel/proc.c"
     ],
     "directory": "/home/fighter/mit6.s081/xv6-labs-2020",
-    "file": "/home/fighter/mit6.s081/xv6-labs-2020/user/usys.S",
-    "output": "/home/fighter/mit6.s081/xv6-labs-2020/user/usys.o"
+    "file": "/home/fighter/mit6.s081/xv6-labs-2020/kernel/proc.c",
+    "output": "/home/fighter/mit6.s081/xv6-labs-2020/kernel/proc.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/riscv64-linux-gnu-gcc",
+      "-Wall",
+      "-Werror",
+      "-O",
+      "-fno-omit-frame-pointer",
+      "-ggdb",
+      "-DSOL_MMAP",
+      "-DLAB_MMAP",
+      "-mcmodel=medany",
+      "-ffreestanding",
+      "-fno-common",
+      "-mno-relax",
+      "-I.",
+      "-fno-stack-protector",
+      "-fno-pie",
+      "-c",
+      "-o",
+      "kernel/sysfile.o",
+      "kernel/sysfile.c"
+    ],
+    "directory": "/home/fighter/mit6.s081/xv6-labs-2020",
+    "file": "/home/fighter/mit6.s081/xv6-labs-2020/kernel/sysfile.c",
+    "output": "/home/fighter/mit6.s081/xv6-labs-2020/kernel/sysfile.o"
   }
 ]
